@@ -99,24 +99,24 @@ class Form{
 				$this->data[$name] 	= $value;
 
 				if(is_int($rules)){
-					$ret = Validator::isElementValid($rules, $value, $name);
+					$ret = Validator::isElementValid($rules, $value, $name, $this);
 					
 					//when empty we can skip the rest of the validation rules
 					if($ret == VALID_EMPTY){
 						continue;
 					}elseif($ret !== true){
-						$this->invalidate($name, $ret);
+						$this->invalidateElement($name, $ret);
 					}
 				}else if(is_array($rules)){
 					//loop over $this->isValid	
 					foreach($rules as $rule){
-						$ret = $this->isValid($rule, $value, $name);
+						$ret = Validator::isElementValid($rule, $value, $name, $this);
 						
 						//when empty we can skip the rest of the validation rules
 						if($ret === VALID_EMPTY){
 							break;
 						}elseif($ret !== true){
-							$this->invalidate($name, $ret);
+							$this->invalidateElement($name, $ret);
 						}
 					}
 				}
@@ -191,6 +191,33 @@ class Form{
 			$this->errors[$name][] = $errorCode;
 		}else{
 			$this->errors[$name] = $errorCode;
+		}
+	}
+
+	/**
+	* Echos out any errors the form has 
+	* @param String $name
+	* @param mixed $message
+	*/	
+	public function error($name, $message){
+		if(isset($this->errors[$name])){
+			if(is_array($message)){
+				$er = Array();
+				foreach($message as $errorCode => $m){
+					if($this->ElementHasError($name, $errorCode)){
+						if($errorCode == VALID_ERROR_TOOLONG){
+							$er[] = "<div>" . sprintf($m, strlen($this->data[$name])) . "</div>";
+						}else{
+							$er[] = "<div>$m</div>";
+						}
+					}
+				}
+				echo implode("\n", $er);
+			}else if(is_string($message)){
+				if($this->itemHasError($name)){
+					echo "<div>$message</div>";
+				}
+			}
 		}
 	}
 

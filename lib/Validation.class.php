@@ -100,13 +100,76 @@ class Validator{
 	* validates the element against the passed validation rules
 	* @param Mixed $rule
 	* @param Mixed $value
-	* @param Mixed $value
+	* @param String $name
+	* @param Form $name
 	* @return Mixed errorCode
 	*/	
-	static public function isElementValid($rule, $value, $name){
+	static public function isElementValid($rule, $value, $name, $form){
+		// Due to the format of the rules, some rules can have parameters, so we strip that into a seperate variable
+		if(is_array($rule)){
+			$params = $rule;
+			$rule = array_shift($rule);
+		}else{
+			$params = Array();
+		}
 	
 	
+		
 	
+		switch($rule){
+			case VALID_DO_NOTHING: 		return true;
+			case VALID_EMPTY:			return empty($value) ? VALID_EMPTY : true;
+			
+			case VALID_NUMBER: 			return self::isNumber($value) ? true : VALID_ERROR_NOT_NUMBER;
+			case VALID_STRING: 			return self::isString($value) ? true : VALID_ERROR_NOT_STRING;
+			case VALID_EMAIL: 			return self::isEmail($value) ? true : VALID_ERROR_EMAIL;
+		
+			case VALID_TIMEZONE: 		return self::isValidTimeZone($value) ? true : VALID_ERROR_TIMEZONE;
+
+			case VALID_URL:				return FormValidator::isValidUrl($value) ? true : VALID_ERROR_NOT_URL;
+			
+			case VALID_LENGTH :			return FormValidator::isValidLength($value, $params);
+			
+			
+			case VALID_MUSTMATCHFIELD: 	return ($value == $form->data[$params['field']]) ? true : VALID_ERROR_NOT_MATCH_FIELD;
+			case VALID_MUSTMATCHREGEX:	return preg_match($params['regex'], $value) ? true : VALID_ERROR_NOT_MATCH_REGEX;
+			
+			case VALID_CUSTOM :
+				if(isset($params['run_noerror']) && $params['run_noerror'] && $form->itemHasError($name)){
+					return true;
+				}else if(!call_user_func($params['callback'], $value, $params)){
+					return $params['errorCode'];
+				}else{
+					return true;
+				}
+			break;
+		
+		
+			case VALID_IN_DATA_LIST:
+				if(($list = $form->getListData($name)) != false){
+					if(in_array($value, $list)){
+						return true;
+					}
+					
+					if(isset($params["searchKeys"]) && $params["searchKeys"]){
+						if(in_array($value, array_keys($list))){
+							return true;
+						}
+					}
+				}else if(isset($params['list'])){
+					if(in_array($value,  $params['list'])){
+						return true;
+					}
+					
+					if(isset($params["searchKeys"]) && $params["searchKeys"]){
+						if(in_array($value, array_keys($params['list']))){
+							return true;
+						}
+					}
+				}
+				return VALID_ERROR_NOTINLIST;
+			break;
+		}
 	}
 
 
