@@ -214,7 +214,7 @@ class Form{
 				}
 				echo implode("\n", $er);
 			}else if(is_string($message)){
-				if($this->itemHasError($name)){
+				if($this->ElementHasError($name)){
 					echo "<div>$message</div>";
 				}
 			}
