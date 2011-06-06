@@ -148,7 +148,7 @@ class Form{
 	* @return Boolean
 	*/
 	public function isMe(){
-		return isset($_POST[$this->className]);
+		return $this->hasPosted() && isset($_POST[$this->className]);
 	}
 	
 	/**
@@ -221,7 +221,6 @@ class Form{
 		}
 	}
 
-
 	/**
 	* Creates an input element with the attributes provided
 	* @param String $name
@@ -266,9 +265,15 @@ class Form{
 
 	/**
 	* Creates an submit button that this class can identify
-	* @param Array $elementAttributes
+	* @param Mixed $elementAttributes
 	*/	
-	public function submitButton($elementAttributes=Array()){
+	public function submitButton($elementAttributes){
+		if(is_string($elementAttributes)){
+			$elementAttributes = Array(
+				"value" => $elementAttributes
+			);
+		}
+		
 		$elementAttributes['type'] = "submit";
 		$this->input($this->className, $elementAttributes);
 	}
