@@ -140,6 +140,7 @@ For example to ensure the age value is only between 0-100 we could do the follow
 		VALID_MUSTMATCHFIELD:	The field must be the same value as the field name contained within the parameter "field"
 		VALID_MUSTMATCHREGEX:	The field must match the regex provided in the parameter "regex"
 		
+--------------
 		
 ### Using Lists
 FormValidator can also validate html lists, and generate those. There are two methods to do this
@@ -170,3 +171,16 @@ Now whenever this form is used, it will have a list of usernames within it, to s
 	<?php
 		$form->select("usernames"); // loads and displays the data from the stored data
 	?>
+	
+	
+-----------
+
+### Multiple Form Fields On One Page
+
+If you want to use multiple form fields on one page, then all you have to do is to ensure that when you create the the html for your form, is that you use
+
+		Form::submitButton()
+
+To build your submit button in your form, this allows FormValidator to track which form triggered the POST
+
+In your controller you can use the Form::isMe() method to check if the form is the one which triggered the POST
