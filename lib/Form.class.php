@@ -23,6 +23,12 @@ class Form{
 	static public $cssErrorClass = "Error";
 	
 	/**
+	* Stores the csrf key
+	* @var String
+	*/
+	public static $csrf_key = false;
+	
+	/**
 	* Stores any errors the form has after validation
 	* @var Map
 	*/
@@ -38,8 +44,7 @@ class Form{
 	* Stores the Form data
 	* @var Map
 	*/
-	private $data = Array();
-	
+	public $data = Array();
 	
 	/**
 	 * Stores the list data for any elements that use lists, eg Select 
@@ -58,7 +63,7 @@ class Form{
 		
 		if(file_exists($file)){
 			require_once($file);
-			$class = __NAMESPACE__ . '\\' . $name . "Form";
+			$class = __NAMESPACE__ . '\\' . basename($name) . "Form";
 			return new $class;
 		}else{
 			throw new FileDoesntExistException();
@@ -91,16 +96,40 @@ class Form{
 	* @return Boolean
 	*/	
 	public function validate(){
-	
+		// Add csrf validation
+		if(self::$csrf_key && !property_exists($this, "no_csrf")){
+			$this->validation['csrf'] = Array(
+				VALID_NOT_EMPTY,
+				Array(
+					VALID_IN_DATA_LIST,
+					"list" => Array(self::$csrf_key)
+				)
+			);
+		}
+		
 		// Loop over each validation rule and check it
 		foreach($this->validation as $name => $rules){
-			if(isset($_POST[$name]) && !isset($_FILES[$name])){
-				$value 			= $_POST[$name];
+			if(property_exists($this, "namespace")){
+				if(isset($_POST[$this->namespace][$name])){
+					$value 			= $_POST[$this->namespace][$name];
+				}
+			}else{
+				if(isset($_POST[$name])){
+					$value 			= $_POST[$name];
+				}
+			}
+			
+			// Invalidate it if the posted elements dont exist
+			if(!isset($value)){
+				$this->invalidateElement($name, VALID_ERROR_ELEMENT_DOESNT_EXIST);
+			}
+			
+			if(!isset($_FILES[$name])){	
 				$this->data[$name] 	= $value;
 
 				if(is_int($rules)){
 					$ret = Validator::isElementValid($rules, $value, $name, $this);
-					
+
 					//when empty we can skip the rest of the validation rules
 					if($ret == VALID_EMPTY){
 						continue;
@@ -226,9 +255,15 @@ class Form{
 	* @param String $name
 	* @param Array $elementAttributes
 	*/	
-	public function input($name, $elementAttributes=Array()){
+	public function input($name, $elementAttributes=Array()){	
+		if(property_exists($this, "namespace")){
+			$full_name = $this->namespace . "[" . $name . "]";
+		}else{
+			$full_name = $name;
+		}
+		
 		$defaultAttributes = Array(
-			"name"	=> $name,
+			"name"	=> $full_name,
 			"type"	=> "text",
 			"value"	=> ""
 		);
@@ -264,6 +299,15 @@ class Form{
 	}
 
 	/**
+	 * Creates the csrf hidden key
+	 */
+	public function csrf(){
+		if(self::$csrf_key){
+			$this->input("csrf", Array("type" => "hidden", "value" => self::$csrf_key));
+		}
+	}
+	
+	/**
 	* Creates an submit button that this class can identify
 	* @param Mixed $elementAttributes
 	*/	
@@ -285,8 +329,14 @@ class Form{
 	* @param Boolean $useKeys
 	*/	
 	public function select($name, $elementAttributes=Array(), $values=Array(), $useKeys=false){
+		if(property_exists($this, "namespace")){
+			$full_name = $this->namespace . "[" . $name . "]";
+		}else{
+			$full_name = $name;
+		}
+		
 		$defaultAttributes = Array(
-			"name" => $name,
+			"name" => $full_name,
 			"type" => "normal",
 		);
 		

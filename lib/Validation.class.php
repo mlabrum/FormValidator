@@ -92,6 +92,7 @@ define("VALID_ERROR_NOTINLIST", "notinlist");
 
 define("VALID_ERROR_NOT_URL", "noturl");
 
+define("VALID_ERROR_ELEMENT_DOESNT_EXIST", "noelement");
 
 class Validator{
 
@@ -117,6 +118,7 @@ class Validator{
 		
 	
 		switch($rule){
+			case VALID_NOT_EMPTY:		return !empty($value) ? true : VALID_ERROR_EMPTY;
 			case VALID_DO_NOTHING: 		return true;
 			case VALID_EMPTY:			return empty($value) ? VALID_EMPTY : true;
 			
@@ -170,6 +172,8 @@ class Validator{
 				return VALID_ERROR_NOTINLIST;
 			break;
 		}
+
+		return true;
 	}
 
 
