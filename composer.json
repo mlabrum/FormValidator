@@ -1,0 +1,17 @@
+{
+    "name": "mlabrum/form-validator",
+    "description": "Provides a Model implementation of Forms",
+    "authors": [
+        {
+            "name": "Matt Labrum",
+            "email": "matt@labrum.me"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+
+    },
+     "autoload": {
+        "psr-0": {"FormValidator": "lib/"}
+    },
+}
