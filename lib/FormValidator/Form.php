@@ -7,6 +7,8 @@
  */
 namespace FormValidator;
 
+// Load the validation class
+require_once(__DIR__ . "/Validation.php");
 
 class Form{
 	
