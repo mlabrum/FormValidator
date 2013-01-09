@@ -50,23 +50,56 @@ class Form{
 	 * Stores the list data for any elements that use lists, eg Select 
 	 * @var Map
 	 */
-	private $listData = Array();
+	public $listData = Array();
+	
+	/**
+	 * Stores the form name
+	 */
+	public $className = "";
+	
+	/**
+	 * If true, the form is tested to be unique submission
+	 * @var Boolean
+	 */
+	public $prevent_duplicates = false;
+	
+	public function __construct($className=false, $namespace=false, $validation=Array()){
+
+		if($className)
+			$this->className = $className;
+		
+		if($namespace)
+			$this->namespace = $namespace;
+		
+		if(!empty($validation))
+			$this->validation = $validation;
+	}
 	
 	/**
 	* Loads the specified form file and initializes it
 	* @param String $name
 	* @return Form
 	*/	
-	static public function loadForm($name){
-		$name	= ucfirst($name);
-		$file		= self::$formDirectory . $name . ".form.php";
-		
+	static public function loadForm($name, $arguments=Array(), $base_path=false){
+		$name	= ucfirst($name);		
+		$file	= (!empty($base_path) ? $base_path : self::$formDirectory) . $name . ".form.php";
+
 		if(file_exists($file)){
 			require_once($file);
 			$class = __NAMESPACE__ . '\\' . basename($name) . "Form";
-			return new $class;
+			if(!empty($arguments)){
+				// If passed arguments, create the class through reflection
+				$reflect = new \ReflectionClass($class);
+				$classI = $reflect->newInstanceArgs($arguments);
+				$classI->className = $name;
+				return $classI;
+			}else{
+				$classI = new $class;
+				$classI->className = $name;
+				return $classI;
+			}
 		}else{
-			throw new FileDoesntExistException();
+			throw new FileDoesntExistException("File $file doesn't exist");
 		}
 	}
 	
@@ -87,7 +120,13 @@ class Form{
 	public function getListData($name){
 		return isset($this->listData[$name]) ? $this->listData[$name] : false;
 	}
-
+	
+	/**
+	* Validates the csrf field, useful if you're using the csrf checking without a full form
+	*/
+	public function validateCsrf(){
+		return (property_exists($this, "namespace") ? $_POST[$this->namespace]['csrf'] : $_POST['csrf']) == self::$csrf_key;
+	}
 
 	/**
 	* validates the form against the current validation rules
@@ -105,7 +144,36 @@ class Form{
 					"list" => Array(self::$csrf_key)
 				)
 			);
+		}	
+		
+		// Test for duplicate form submission
+		$can_save_session_id = false;
+		if($this->prevent_duplicates){
+			// Must have an active session
+			$id = session_id();
+			
+			if(!empty($id)){
+				// Check if there are form_submitted_ids
+				$this->validation['unique_uuid'] = Array(VALID_NOT_EMPTY);
+				
+				if(!empty($_SESSION['form_submitted_ids'])){
+					$ids = $_SESSION['form_submitted_ids'];
+					
+					// Add a custom validation rule
+					$this->validation['unique_uuid'] = Array(
+						VALID_NOT_EMPTY,
+						Array(VALID_CUSTOM, "errorCode" => "used", "callback" => function($value, $params) use($ids){
+							return !in_array($value, $ids);
+						})
+					);
+				}else{
+					$_SESSION['form_submitted_ids'] = Array();
+				}
+
+				$can_save_session_id = true;				
+			}
 		}
+		
 		
 		// Loop over each validation rule and check it
 		foreach($this->validation as $name => $rules){
@@ -121,7 +189,11 @@ class Form{
 			
 			// Invalidate it if the posted elements dont exist
 			if(!isset($value)){
-				$this->invalidateElement($name, VALID_ERROR_ELEMENT_DOESNT_EXIST);
+				// Check if VALID_EMPTY is set
+				if(!($rules == VALID_EMPTY || (is_array($rules) && in_array(VALID_EMPTY, $rules)))){
+					$this->invalidateElement($name, VALID_ERROR_ELEMENT_DOESNT_EXIST);
+				}
+				continue;
 			}
 			
 			if(!isset($_FILES[$name])){	
@@ -152,6 +224,12 @@ class Form{
 			}
 		}
 		
+		// Add the submitted id to the session store
+		if(!empty($this->data['unique_uuid']) && $can_save_session_id){
+			$_SESSION['form_submitted_ids'][] = $this->data['unique_uuid'];
+		}
+		
+		
 		// Call the subclass when the verify is finished, so they don't have to override the validation method
 		if(method_exists($this, "verify")){
 			$this->verify($this->data);
@@ -169,7 +247,7 @@ class Form{
 	public function hasPosted(){
 		return $_SERVER['REQUEST_METHOD'] == "POST";
 	}
-
+	
 	/**
 	* Returns true if the current form has posted, this will only work if you use the $form->submitButtom() function to generate your submit button 
 	* @param String $name
@@ -177,7 +255,16 @@ class Form{
 	* @return Boolean
 	*/
 	public function isMe(){
-		return $this->hasPosted() && isset($_POST[$this->className]);
+		if($this->hasPosted()){
+			if($this->namespace) {
+				if(isset($_POST[$this->namespace][$this->className])){
+					return true;
+				}
+			}elseif(isset($_POST[$this->className])){
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	/**
@@ -255,7 +342,15 @@ class Form{
 	* @param String $name
 	* @param Array $elementAttributes
 	*/	
-	public function input($name, $elementAttributes=Array()){	
+	public function input($name, $elementAttributes=Array()){
+		
+		// Allow an array input
+		if(is_array($name)){
+			$elementAttributes	= $name;
+			$name				= $name['name'];
+			unset($elementAttributes['name']); 
+		}
+			
 		if(property_exists($this, "namespace")){
 			$full_name = $this->namespace . "[" . $name . "]";
 		}else{
@@ -302,9 +397,35 @@ class Form{
 	 * Creates the csrf hidden key
 	 */
 	public function csrf(){
+		
+		// Add the CSRF prevention key
 		if(self::$csrf_key){
 			$this->input("csrf", Array("type" => "hidden", "value" => self::$csrf_key));
 		}
+		
+		// Output a unique ID for the form, note: this can be anything, the value is only tested by "have we seen this before?"
+		if($this->prevent_duplicates){
+			$this->input("unique_uuid", Array("type" => "hidden", "value" => sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+				// 32 bits for "time_low"
+				mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ),
+
+				// 16 bits for "time_mid"
+				mt_rand( 0, 0xffff ),
+
+				// 16 bits for "time_hi_and_version",
+				// four most significant bits holds version number 4
+				mt_rand( 0, 0x0fff ) | 0x4000,
+
+				// 16 bits, 8 bits for "clk_seq_hi_res",
+				// 8 bits for "clk_seq_low",
+				// two most significant bits holds zero and one for variant DCE1.1
+				mt_rand( 0, 0x3fff ) | 0x8000,
+
+				// 48 bits for "node"
+				mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff )
+			)));
+		}
+		
 	}
 	
 	/**
@@ -375,7 +496,7 @@ class Form{
 			
 			if($useKeys){
 				$html .= sprintf("value='%s'", htmlentities($value, ENT_QUOTES));
-				if($selected == $value || $selected == $name){
+				if($selected === (string)$value || $selected === $name){
 					$html .= " selected = 'selected' ";
 				}
 			}else{
@@ -386,6 +507,13 @@ class Form{
 			echo $html . ">$name</option>\n";
 		}
 		echo "</select>\n";
+	}
+	
+	public function dumpIntoHiddenFields(){
+		foreach($this->data as $key => $value){
+			if($key == "csrf")continue;
+			$this->input($key, Array("type" => "hidden", "value" => $value));
+		}
 	}
 
 }

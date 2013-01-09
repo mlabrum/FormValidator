@@ -78,6 +78,7 @@ define("VALID_ERROR_EMAIL", "notemail");
 define("VALID_ERROR_EMPTY", "empty");
 define("VALID_ERROR_CUSTOM", "custom");
 define("VALID_ERROR_NOT_NUMBER", "number");
+define("VALID_ERROR_NOT_BOOLEAN", 'boolean');
 define("VALID_ERROR_NOT_STRING", "string");
 
 
@@ -118,28 +119,37 @@ class Validator{
 		
 	
 		switch($rule){
-			case VALID_NOT_EMPTY:		return !empty($value) ? true : VALID_ERROR_EMPTY;
+			case VALID_NOT_EMPTY:		return (!is_null($value) && $value != "") ? true : VALID_ERROR_EMPTY;
 			case VALID_DO_NOTHING: 		return true;
 			case VALID_EMPTY:			return empty($value) ? VALID_EMPTY : true;
 			
-			case VALID_NUMBER: 			return self::isNumber($value) ? true : VALID_ERROR_NOT_NUMBER;
+			case FILTER_VALIDATE_INT:
+			case VALID_NUMBER: 			return self::isNumber($value, $params) ? true : VALID_ERROR_NOT_NUMBER;
 			case VALID_STRING: 			return self::isString($value) ? true : VALID_ERROR_NOT_STRING;
+			
+			case FILTER_VALIDATE_EMAIL:
 			case VALID_EMAIL: 			return self::isEmail($value) ? true : VALID_ERROR_EMAIL;
 		
 			case VALID_TIMEZONE: 		return self::isValidTimeZone($value) ? true : VALID_ERROR_TIMEZONE;
 
-			case VALID_URL:				return FormValidator::isValidUrl($value) ? true : VALID_ERROR_NOT_URL;
+			case VALID_URL:				return self::isValidUrl($value) ? true : VALID_ERROR_NOT_URL;
 			
-			case VALID_LENGTH :			return FormValidator::isValidLength($value, $params);
+			case VALID_LENGTH :			return self::isValidLength($value, $params);
 			
 			
 			case VALID_MUSTMATCHFIELD: 	return ($value == $form->data[$params['field']]) ? true : VALID_ERROR_NOT_MATCH_FIELD;
+			
+			case FILTER_VALIDATE_REGEXP:
 			case VALID_MUSTMATCHREGEX:	return preg_match($params['regex'], $value) ? true : VALID_ERROR_NOT_MATCH_REGEX;
+			
+			
+			case FILTER_VALIDATE_BOOLEAN: (filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) !== null) ? true : VALID_ERROR_NOT_NUMBER;
+			
 			
 			case VALID_CUSTOM :
 				if(isset($params['run_noerror']) && $params['run_noerror'] && $form->itemHasError($name)){
 					return true;
-				}else if(!call_user_func($params['callback'], $value, $params)){
+				}else if(!call_user_func($params['callback'], $value, $params, $form)){
 					return $params['errorCode'];
 				}else{
 					return true;
@@ -148,6 +158,7 @@ class Validator{
 		
 		
 			case VALID_IN_DATA_LIST:
+				
 				if(($list = $form->getListData($name)) != false){
 					if(in_array($value, $list)){
 						return true;
@@ -191,8 +202,12 @@ class Validator{
 	* @param int $value
 	* @return Boolean
 	*/
-	static public function isNumber($value){
-		return (boolean) filter_var($value, FILTER_VALIDATE_INT);
+	static public function isNumber($value, $params){
+		if(!isset($params['no_float'])){
+			return (boolean) filter_var($value, FILTER_VALIDATE_FLOAT);
+		}else{
+			return (boolean) filter_var($value, FILTER_VALIDATE_INT);
+		}
 	}
 	
 	/**
