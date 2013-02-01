@@ -204,9 +204,9 @@ class Validator{
 	*/
 	static public function isNumber($value, $params){
 		if(!isset($params['no_float'])){
-			return (boolean) filter_var($value, FILTER_VALIDATE_FLOAT);
+			return filter_var($value, FILTER_VALIDATE_FLOAT) !== false;
 		}else{
-			return (boolean) filter_var($value, FILTER_VALIDATE_INT);
+			return filter_var($value, FILTER_VALIDATE_INT) !== false;
 		}
 	}
 	
