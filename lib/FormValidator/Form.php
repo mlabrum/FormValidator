@@ -60,13 +60,18 @@ class Form{
 	public $className = "";
 	
 	/**
+	 * Stores the data source to check against
+	 */
+	public $dataSource = null;
+	
+	/**
 	 * If true, the form is tested to be unique submission
 	 * @var Boolean
 	 */
 	public $prevent_duplicates = false;
-	
+		
 	public function __construct($className=false, $namespace=false, $validation=Array()){
-
+		
 		if($className)
 			$this->className = $className;
 		
@@ -75,6 +80,18 @@ class Form{
 		
 		if(!empty($validation))
 			$this->validation = $validation;
+	}
+	
+	/**
+	 * Sets the data source to check against, this defaults to $_POST
+	 */
+	public function setDataSource($post){
+		// Support passing in a symfony request object directly
+		if(!is_array($post) && get_class($post) == 'Symfony\Component\HttpFoundation\Request'){
+			$post = $request->request->all();
+		}
+	
+		$this->dataSource = $post;
 	}
 	
 	/**
@@ -89,13 +106,15 @@ class Form{
 		if(file_exists($file)){
 			require_once($file);
 			$class = __NAMESPACE__ . '\\' . basename($name) . "Form";
+			
+			// If passed arguments, create the class through reflection
 			if(!empty($arguments)){
-				// If passed arguments, create the class through reflection
 				$reflect = new \ReflectionClass($class);
 				$classI = $reflect->newInstanceArgs($arguments);
 				$classI->className = $name;
 				return $classI;
 			}else{
+				// Otherwise load normally
 				$classI = new $class;
 				$classI->className = $name;
 				return $classI;
@@ -127,7 +146,7 @@ class Form{
 	* Validates the csrf field, useful if you're using the csrf checking without a full form
 	*/
 	public function validateCsrf(){
-		return (property_exists($this, "namespace") ? $_POST[$this->namespace]['csrf'] : $_POST['csrf']) == self::$csrf_key;
+		return (property_exists($this, "namespace") ? $this->dataSource[$this->namespace]['csrf'] : $this->dataSource['csrf']) == self::$csrf_key;
 	}
 
 	/**
@@ -137,6 +156,12 @@ class Form{
 	* @return Boolean
 	*/	
 	public function validate(){
+		
+		// Set the default data source if it didn't exist
+		if(!is_array($this->dataSource)){
+			$this->setDataSource($_POST);
+		}
+	
 		// Add csrf validation
 		if(self::$csrf_key && !property_exists($this, "no_csrf")){
 			$this->validation['csrf'] = Array(
@@ -146,29 +171,25 @@ class Form{
 					"list" => Array(self::$csrf_key)
 				)
 			);
-		}	
+		}
 		
 		// Test for duplicate form submission
 		$can_save_session_id = false;
 		if($this->prevent_duplicates){
-			// Must have an active session
-			$id = session_id();
 			
-			if(!empty($id)){
+			// Must have an active session
+			if(session_id() !== ""){
 				// Check if there are form_submitted_ids
-				$this->validation['unique_uuid'] = Array(VALID_NOT_EMPTY);
-				
 				if(!empty($_SESSION['form_submitted_ids'])){
-					$ids = $_SESSION['form_submitted_ids'];
-					
 					// Add a custom validation rule
 					$this->validation['unique_uuid'] = Array(
 						VALID_NOT_EMPTY,
-						Array(VALID_CUSTOM, "errorCode" => "used", "callback" => function($value, $params) use($ids){
-							return !in_array($value, $ids);
+						Array(VALID_CUSTOM, "errorCode" => "used", "callback" => function($value, $params){
+							return !in_array($value, $_SESSION['form_submitted_ids']);
 						})
 					);
 				}else{
+					$this->validation['unique_uuid'] = Array(VALID_NOT_EMPTY);
 					$_SESSION['form_submitted_ids'] = Array();
 				}
 
@@ -180,12 +201,12 @@ class Form{
 		// Loop over each validation rule and check it
 		foreach($this->validation as $name => $rules){
 			if(property_exists($this, "namespace")){
-				if(isset($_POST[$this->namespace][$name])){
-					$value 			= $_POST[$this->namespace][$name];
+				if(isset($this->dataSource[$this->namespace][$name])){
+					$value 			= $this->dataSource[$this->namespace][$name];
 				}
 			}else{
-				if(isset($_POST[$name])){
-					$value 			= $_POST[$name];
+				if(isset($this->dataSource[$name])){
+					$value 			= $this->dataSource[$name];
 				}
 			}
 			
@@ -259,10 +280,10 @@ class Form{
 	public function isMe(){
 		if($this->hasPosted()){
 			if($this->namespace) {
-				if(isset($_POST[$this->namespace][$this->className])){
+				if(isset($this->dataSource[$this->namespace][$this->className])){
 					return true;
 				}
-			}elseif(isset($_POST[$this->className])){
+			}elseif(isset($this->dataSource[$this->className])){
 				return true;
 			}
 		}
