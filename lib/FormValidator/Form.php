@@ -513,6 +513,12 @@ class Form{
 		// Echo out the first part of the select element
 		echo "<select " . implode(" ", $a) . " >\n";
 		
+		if(isset($attributes['placeholder'])){
+			echo "<option disabled" . (!$selected ? " selected": ""). ">". htmlentities($attributes['placeholder']). "</option>";
+			
+			unset($attributes['placeholder']);
+		}
+		
 		// Echo out the values included within the select element
 		foreach($values as $value => $name){
 			$html = "<option ";
