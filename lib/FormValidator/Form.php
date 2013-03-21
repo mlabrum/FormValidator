@@ -88,7 +88,7 @@ class Form{
 	public function setDataSource($post){
 		// Support passing in a symfony request object directly
 		if(!is_array($post) && get_class($post) == 'Symfony\Component\HttpFoundation\Request'){
-			$post = $request->request->all();
+			$post = $post->request->all();
 		}
 	
 		$this->dataSource = $post;
