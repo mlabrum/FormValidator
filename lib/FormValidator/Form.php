@@ -92,6 +92,8 @@ class Form{
 		}
 	
 		$this->dataSource = $post;
+		
+		return $this;
 	}
 	
 	/**
