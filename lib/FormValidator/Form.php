@@ -270,7 +270,7 @@ class Form{
 	* @return Boolean
 	*/	
 	public function hasPosted(){
-		return $_SERVER['REQUEST_METHOD'] == "POST";
+		return $_SERVER['REQUEST_METHOD'] == "POST" || !empty($this->dataSource);
 	}
 	
 	/**
