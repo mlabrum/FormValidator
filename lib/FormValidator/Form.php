@@ -202,6 +202,7 @@ class Form{
 		
 		// Loop over each validation rule and check it
 		foreach($this->validation as $name => $rules){
+			unset($value);
 			if(property_exists($this, "namespace")){
 				if(isset($this->dataSource[$this->namespace][$name])){
 					$value 			= $this->dataSource[$this->namespace][$name];
