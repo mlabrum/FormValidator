@@ -282,11 +282,16 @@ class Form{
 	*/
 	public function isMe(){
 		if($this->hasPosted()){
+			$data = $this->dataSource;
+			if(empty($data)){
+				$data = $_POST;
+			}
+			
 			if($this->namespace) {
-				if(isset($this->dataSource[$this->namespace][$this->className])){
+				if(isset($data[$this->namespace][$this->className])){
 					return true;
 				}
-			}elseif(isset($this->dataSource[$this->className])){
+			}elseif(isset($data[$this->className])){
 				return true;
 			}
 		}
